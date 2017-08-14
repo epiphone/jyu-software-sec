@@ -1,0 +1,15 @@
+[zookd.c:65]
+The 'reqpath' value gets read from HTTP request path without any overflow
+checks in 'url_decode'. Thus with a long HTTP request path we can trigger
+a buffer overflow, for example "GET /" + (2048 * 'X') + " HTTP/1.0\r\n".
+The vulnerability can be prevented using stack canaries since overflowing the
+'reqpath' buffer would write over the canary as well.
+
+    char reqpath[2048];
+
+[http.c:165]
+another description.
+
+    sprintf(envvar, "HTTP_%s", buf);
+
+# many more come here
