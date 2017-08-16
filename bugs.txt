@@ -1,15 +1,59 @@
 [zookd.c:65]
-The 'reqpath' value gets read from HTTP request path without any overflow
+The 'reqpath' variable gets read from HTTP request path without any overflow
 checks in 'url_decode'. Thus with a long HTTP request path we can trigger
-a buffer overflow, for example "GET /" + (2048 * 'X') + " HTTP/1.0\r\n".
+a buffer overflow: for example "GET /" + (2048 * 'X') + " HTTP/1.0\r\n".
 The vulnerability can be prevented using stack canaries since overflowing the
 'reqpath' buffer would write over the canary as well.
 
     char reqpath[2048];
+    ...
+    /* get the request line */
+    if ((errmsg = http_request_line(fd, reqpath, env, &env_len)))
 
-[http.c:165]
-another description.
 
+[http.c:276]
+The 'name' variable is unsafely strcat'd to the 'pn' buffer. 'name' in turn is
+read from request path so a long request path like in the first vulnerability
+works here too.
+
+    char pn[1024];
+    ...
+    strcat(pn, name);
+
+
+[http.c:120]
+The 'value' variable in 'http_request_headers' is similarly read via
+'url_decode' from HTTP request headers without any bounds checks. With a long
+HTTP header value we can cause an overflow: for example
+"GET / HTTP/1.0\r\nFaux-Header: " + (540 * "X") + "\r\n".
+The vulnerability can be prevented with a stack canary placed after the return
+pointer of 'http_request_headers'.
+
+    char value[512];
+    ...
+    /* Decode URL escape sequences in the value */
+    url_decode(value, sp);
+
+
+[http.c:121]
+The 'envvar' variable is formatted with 'sprintf' which performs no bounds
+checking. Thus with a long HTTP header name we can cause an overflow, e.g.
+"GET / HTTP/1.0\r\n" + (1048 * "X") + ": some-value\r\n".
+The vulnerability can be prevented with a stack canary just like the previous
+one.
+
+    char envvar[512];
+    ...
     sprintf(envvar, "HTTP_%s", buf);
 
-# many more come here
+
+[http.c:353]
+The 'dirname' variable is unsafely strcopy'd to the 'name' buffer. Again, 'pn'
+comes from the request path so this exploit works just like the first one.
+
+    char name[1024];
+    ...
+    dir_join(name, pn, indices[i]);
+    ...
+    strcpy(dst, dirname);
+

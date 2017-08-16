@@ -1,0 +1,51 @@
+2)
+exploit-2a.py overflows the 'char reqpath[2048]' buffer in zookdc.:65.
+exploit-2b.py overflows the 'char value[512]' buffer in http.c:120.
+
+3)
+exploit-3.py overflows the buffer 'char reqpath[2048]' in zookd.c:65. The other
+vulnerabilities can be likewise exploited.
+
+4)
+exploit-4a.py overflows the 'char reqpath[2048]' buffer in zookdc.:65.
+exploit-4b.py overflows the 'char value[512]' buffer in http.c:120. The other
+vulnerabilities can be likewise exploited.
+
+5)
+An obvious vulnerability is that any files in the /home/httpd/lab directory
+can be fetched via HTTP. An attacker could for example access the server source
+code at http://192.168.89.128:8080/http.c to easily find more exploits.
+This exploit is limited in the sense that files outside the lab directory cannot
+be accessed. To fix the exploit, we should add some kind of routing logic or at
+least a file whilelist to http_serve.
+
+The second vulnerability I found is that any executable files in the server
+directory can be executed via a simple HTTP GET request, for example
+http://192.168.89.128:8080/some-script.sh. An attacker can thus somehow
+inject a malicious script at the server and execute it via this exploit. The
+same fix as above applies here too: the server should check who can execute
+which files, defaulting to no files at all.
+
+6)
+
+[zookd.c:65]
+In url_decode, change the while loop
+  for (;;)
+to
+  for (i = 0; i < strlen(dst); i++) {
+in order to prevent overflowing the dst buffer.
+
+[http.c:276]
+Simply change
+  strcat(pn, name);
+to
+  strncat(pn, name, 1024);
+to avoid overflowing the pn buffer.
+
+[http.c:120]
+[http.c:121]
+The url_decode fix applies here too. Additionally, in http.c:165 use snprintf
+instead of sprintf.
+
+[http.c:353]
+In dir_join, use strncpy/strncat over the unsafe strcpy/strcat functions.
